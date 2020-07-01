@@ -1,0 +1,14 @@
+{
+    "files.associations": {
+        "uv-common.h": "c",
+        "uv.h": "c",
+        "string.h": "c",
+        "crt_externs.h": "c",
+        "istream": "c",
+        "locale": "c",
+        "ostream": "c",
+        "complex": "c",
+        "ios": "c",
+        "queue": "c"
+    }
+}
