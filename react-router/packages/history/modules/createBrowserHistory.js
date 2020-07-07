@@ -4,7 +4,7 @@ import {
   stripTrailingSlash,
   hasBasename,
   stripBasename,
-  createPath
+  createPath,
 } from './PathUtils.js';
 import createTransitionManager from './createTransitionManager.js';
 import {
@@ -12,7 +12,7 @@ import {
   getConfirmation,
   supportsHistory,
   supportsPopStateOnHashChange,
-  isExtraneousPopstateEvent
+  isExtraneousPopstateEvent,
 } from './DOMUtils.js';
 import invariant from './invariant.js';
 import warning from './warning.js';
@@ -44,7 +44,7 @@ function createBrowserHistory(props = {}) {
   const {
     forceRefresh = false,
     getUserConfirmation = getConfirmation,
-    keyLength = 6
+    keyLength = 6,
   } = props;
   // 添加头部/，移除尾部/
   const basename = props.basename
@@ -68,7 +68,7 @@ function createBrowserHistory(props = {}) {
         '".'
     );
 
-    // 移除basename
+    // 如果提供了 basename, 那么 path 部分需要移除 basename 部分
     if (basename) path = stripBasename(path, basename);
 
     // location对象含有
@@ -77,9 +77,7 @@ function createBrowserHistory(props = {}) {
   }
 
   function createKey() {
-    return Math.random()
-      .toString(36)
-      .substr(2, keyLength);
+    return Math.random().toString(36).substr(2, keyLength);
   }
 
   const transitionManager = createTransitionManager();
@@ -120,7 +118,7 @@ function createBrowserHistory(props = {}) {
         location,
         action,
         getUserConfirmation,
-        ok => {
+        (ok) => {
           if (ok) {
             setState({ action, location });
           } else {
@@ -138,7 +136,7 @@ function createBrowserHistory(props = {}) {
     // TODO: We could probably make this more reliable by
     // keeping a list of keys we've seen in sessionStorage.
     // Instead, we just default to 0 for keys we don't know.
-    
+
     let toIndex = allKeys.indexOf(toLocation.key);
 
     if (toIndex === -1) toIndex = 0;
@@ -184,7 +182,7 @@ function createBrowserHistory(props = {}) {
       location,
       action,
       getUserConfirmation,
-      ok => {
+      (ok) => {
         if (!ok) return;
 
         const href = createHref(location);
@@ -197,6 +195,7 @@ function createBrowserHistory(props = {}) {
 
           // 强制刷新
           if (forceRefresh) {
+            /** 跳转，新增历史访问记录 */
             window.location.href = href;
           } else {
             const prevIndex = allKeys.indexOf(history.location.key);
@@ -205,6 +204,7 @@ function createBrowserHistory(props = {}) {
             nextKeys.push(location.key);
             allKeys = nextKeys;
 
+            // 调用 pushState 不会触发 state change 事件
             setState({ action, location });
           }
         } else {
@@ -238,7 +238,7 @@ function createBrowserHistory(props = {}) {
       location,
       action,
       getUserConfirmation,
-      ok => {
+      (ok) => {
         if (!ok) return;
 
         const href = createHref(location);
@@ -344,7 +344,7 @@ function createBrowserHistory(props = {}) {
     goBack,
     goForward,
     block,
-    listen
+    listen,
   };
 
   return history;

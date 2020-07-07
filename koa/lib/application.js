@@ -1,28 +1,37 @@
-
-'use strict';
+"use strict";
 
 /**
  * Module dependencies.
  */
 
-const isGeneratorFunction = require('is-generator-function');
-const debug = require('debug')('koa:application');
-const onFinished = require('on-finished');
-const response = require('./response');
-const compose = require('koa-compose');
-const context = require('./context');
-const request = require('./request');
-const statuses = require('statuses');
-const Emitter = require('events');
-const util = require('util');
+const isGeneratorFunction = require("is-generator-function");
+const debug = require("debug")("koa:application");
+// http 请求完成、关闭、出错 监听器
+const onFinished = require("on-finished");
+const response = require("./response");
+// 中间件组合工具，异步流程控制方案中的一种
+const compose = require("koa-compose");
+const context = require("./context");
+const request = require("./request");
+const statuses = require("statuses");
+const Emitter = require("events");
+const util = require("util");
 // 流处理
-const Stream = require('stream');
-const http = require('http');
-const only = require('only');
-const convert = require('koa-convert');
+const Stream = require("stream");
+const http = require("http");
+const only = require("only");
+const convert = require("koa-convert");
 // 废弃
-const deprecate = require('depd')('koa');
-const { HttpError } = require('http-errors');
+const deprecate = require("depd")("koa");
+const { HttpError } = require("http-errors");
+
+/**
+ *
+ * 要点
+ * 1. convert 是如何转换 generator 的？
+ * 2. 中间件是如何关联的？
+ *
+ */
 
 /**
  * Expose `Application` class.
@@ -37,27 +46,30 @@ module.exports = class Application extends Emitter {
    */
 
   /**
-    *
-    * @param {object} [options] Application options
-    * @param {string} [options.env='development'] Environment
-    * @param {string[]} [options.keys] Signed cookie keys
-    * @param {boolean} [options.proxy] Trust proxy headers
-    * @param {number} [options.subdomainOffset] Subdomain offset
-    * @param {boolean} [options.proxyIpHeader] proxy ip header, default to X-Forwarded-For
-    * @param {boolean} [options.maxIpsCount] max ips read from proxy ip header, default to 0 (means infinity)
-    *
-    */
+   *
+   * @param {object} [options] Application options
+   * @param {string} [options.env='development'] Environment
+   * @param {string[]} [options.keys] Signed cookie keys
+   * @param {boolean} [options.proxy] Trust proxy headers
+   * @param {number} [options.subdomainOffset] Subdomain offset
+   * @param {boolean} [options.proxyIpHeader] proxy ip header, default to X-Forwarded-For
+   * @param {boolean} [options.maxIpsCount] max ips read from proxy ip header, default to 0 (means infinity)
+   *
+   */
 
   constructor(options) {
     super();
     options = options || {};
+    /** 是否开启代理 */
     this.proxy = options.proxy || false;
     this.subdomainOffset = options.subdomainOffset || 2;
-    this.proxyIpHeader = options.proxyIpHeader || 'X-Forwarded-For';
+    this.proxyIpHeader = options.proxyIpHeader || "X-Forwarded-For";
     this.maxIpsCount = options.maxIpsCount || 0;
-    this.env = options.env || process.env.NODE_ENV || 'development';
+    this.env = options.env || process.env.NODE_ENV || "development";
     if (options.keys) this.keys = options.keys;
+    /** 存放中间件 */
     this.middleware = [];
+    /** 请求上下文 */
     this.context = Object.create(context);
     this.request = Object.create(request);
     this.response = Object.create(response);
@@ -77,8 +89,8 @@ module.exports = class Application extends Emitter {
    */
 
   listen(...args) {
-    debug('listen');
-    // 创建服务器
+    debug("listen");
+    /** 创建服务器 */
     const server = http.createServer(this.callback());
     return server.listen(...args);
   }
@@ -92,11 +104,7 @@ module.exports = class Application extends Emitter {
    */
 
   toJSON() {
-    return only(this, [
-      'subdomainOffset',
-      'proxy',
-      'env'
-    ]);
+    return only(this, ["subdomainOffset", "proxy", "env"]);
   }
 
   /**
@@ -120,16 +128,35 @@ module.exports = class Application extends Emitter {
    * @api public
    */
 
+  /**
+   *
+   * generator
+   * function * ( next ) {
+
+        // 执行中间件的操作
+        log( this )
+
+        if ( next ) {
+            yield next
+        }
+    }
+   *
+   *
+   */
+
   // 添加中间件
   use(fn) {
-    if (typeof fn !== 'function') throw new TypeError('middleware must be a function!');
+    if (typeof fn !== "function")
+      throw new TypeError("middleware must be a function!");
     if (isGeneratorFunction(fn)) {
-      deprecate('Support for generators will be removed in v3. ' +
-                'See the documentation for examples of how to convert old middleware ' +
-                'https://github.com/koajs/koa/blob/master/docs/migration.md');
+      deprecate(
+        "Support for generators will be removed in v3. " +
+          "See the documentation for examples of how to convert old middleware " +
+          "https://github.com/koajs/koa/blob/master/docs/migration.md"
+      );
       fn = convert(fn);
     }
-    debug('use %s', fn._name || fn.name || '-');
+    debug("use %s", fn._name || fn.name || "-");
     this.middleware.push(fn);
     return this;
   }
@@ -143,14 +170,16 @@ module.exports = class Application extends Emitter {
    */
 
   callback() {
+    /** 组装中间件间 */
     const fn = compose(this.middleware);
 
-    if (!this.listenerCount('error')) this.on('error', this.onerror);
+    if (!this.listenerCount("error")) this.on("error", this.onerror);
 
     // 这里的req, res是node中的request, response
     // 并非Koa中的
     const handleRequest = (req, res) => {
       // 根据请求req, res生成context
+      /** handleRequest 在每次请求时均会重新执行，因此 ctx 作用域为当前请求，与请求一一对应 */
       const ctx = this.createContext(req, res);
       return this.handleRequest(ctx, fn);
     };
@@ -167,9 +196,12 @@ module.exports = class Application extends Emitter {
   handleRequest(ctx, fnMiddleware) {
     const res = ctx.res;
     res.statusCode = 404;
-    const onerror = err => ctx.onerror(err);
+    const onerror = (err) => ctx.onerror(err);
     const handleResponse = () => respond(ctx);
     onFinished(res, onerror);
+    /** 中间件处理完毕后，执行 handleResponse 处理响应 */
+    /** 中间件均通过 ctx 获取之前环节处理结果 */
+    /** catch 统一处理 */
     return fnMiddleware(ctx).then(handleResponse).catch(onerror);
   }
 
@@ -181,8 +213,8 @@ module.exports = class Application extends Emitter {
 
   createContext(req, res) {
     const context = Object.create(this.context);
-    const request = context.request = Object.create(this.request);
-    const response = context.response = Object.create(this.response);
+    const request = (context.request = Object.create(this.request));
+    const response = (context.response = Object.create(this.response));
     context.app = request.app = response.app = this;
     context.req = request.req = response.req = req;
     context.res = request.res = response.res = res;
@@ -190,6 +222,7 @@ module.exports = class Application extends Emitter {
     request.response = response;
     response.request = request;
     context.originalUrl = request.originalUrl = req.url;
+    /** state 用于中间件间共享状态 */
     context.state = {};
     return context;
   }
@@ -202,14 +235,15 @@ module.exports = class Application extends Emitter {
    */
 
   onerror(err) {
-    if (!(err instanceof Error)) throw new TypeError(util.format('non-error thrown: %j', err));
+    if (!(err instanceof Error))
+      throw new TypeError(util.format("non-error thrown: %j", err));
 
     if (404 == err.status || err.expose) return;
     if (this.silent) return;
 
     const msg = err.stack || err.toString();
     console.error();
-    console.error(msg.replace(/^/gm, '  '));
+    console.error(msg.replace(/^/gm, "  "));
     console.error();
   }
 };
@@ -236,8 +270,8 @@ function respond(ctx) {
     return res.end();
   }
 
-  if ('HEAD' === ctx.method) {
-    if (!res.headersSent && !ctx.response.has('Content-Length')) {
+  if ("HEAD" === ctx.method) {
+    if (!res.headersSent && !ctx.response.has("Content-Length")) {
       const { length } = ctx.response;
       if (Number.isInteger(length)) ctx.length = length;
     }
@@ -252,7 +286,7 @@ function respond(ctx) {
       body = ctx.message || String(code);
     }
     if (!res.headersSent) {
-      ctx.type = 'text';
+      ctx.type = "text";
       ctx.length = Buffer.byteLength(body);
     }
     return res.end(body);
@@ -260,11 +294,13 @@ function respond(ctx) {
 
   // responses
   if (Buffer.isBuffer(body)) return res.end(body);
-  if ('string' == typeof body) return res.end(body);
+  if ("string" == typeof body) return res.end(body);
+  /** 流数据，直接 pipe */
   if (body instanceof Stream) return body.pipe(res);
 
   // body: json
   body = JSON.stringify(body);
+  /** 响应头还未发送 */
   if (!res.headersSent) {
     ctx.length = Buffer.byteLength(body);
   }

@@ -4,6 +4,7 @@ const cache = {};
 const cacheLimit = 10000;
 let cacheCount = 0;
 
+/** 将 path 转换为 regexp */
 function compilePath(path) {
   if (cache[path]) return cache[path];
 
