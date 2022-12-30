@@ -50,7 +50,7 @@
     "karma-mocha": "^1.2.0",
     "karma-mocha-reporter": "^2.2.0",
     "karma-safari-launcher": "^1.0.0",
-    "mocha": "^6.1.4",
+    "mocha": "^10.2.0",
     "mocha-junit-reporter": "^1.18.0",
     "native-promise-only": "^0.8.0-a",
     "nyc": "^14.1.1",
